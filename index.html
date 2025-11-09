@@ -58,8 +58,8 @@
     </div>
 
     <script type="module">
-        // Import necessary components from our local script and the Firebase CDN
-        import { getChargingSessionsCollection, isAuthReady, currentUserId, db } from 'scripts.js';
+        // The import statement is simplified to 'scripts.js' to fix module resolution errors.
+        import { getChargingSessionsCollection, isAuthReady, currentUserId } from 'scripts.js';
         import { addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const sessionForm = document.getElementById('sessionForm');
@@ -93,6 +93,7 @@
         sessionForm.addEventListener('submit', async (e) => {
             e.preventDefault();
 
+            // Guard against submissions if not ready or already saving
             if (!isAuthReady || isSaving) return;
             
             isSaving = true;
@@ -132,25 +133,30 @@
                 showMessage(`Failed to start session: ${error.message}`, false);
             } finally {
                 isSaving = false;
-                submitButton.disabled = false;
                 submitButton.textContent = 'Start Charging';
             }
         });
         
-        /** Handles the custom 'authReady' event dispatched by scripts.js. */
+        /** * Handles the custom 'authReady' event dispatched by scripts.js,
+         * which is the signal that Firebase is initialized and the user is authenticated. 
+         */
         function handleAuthReady() {
             // Update UI to reflect successful authentication
             authStatus.textContent = `Status: Authenticated. User ID starts with ${currentUserId.substring(0, 8)}...`;
             authStatus.classList.remove('bg-yellow-100', 'text-yellow-700');
             authStatus.classList.add('bg-green-100', 'text-green-700');
             displayUserId.textContent = currentUserId;
-            submitButton.disabled = false; // Enable the submit button
+            
+            // Re-check if we are in the middle of a submission attempt, otherwise enable the button
+            if (!isSaving) {
+                 submitButton.disabled = false;
+            }
         }
 
-        // Wait for the custom event fired by scripts.js
+        // 1. Wait for the custom event fired by scripts.js
         window.addEventListener('authReady', handleAuthReady);
         
-        // Check if authentication might have completed before the listener was attached
+        // 2. Immediate check: If scripts.js loaded faster and already set the flag, run the handler immediately.
         if (isAuthReady) {
              handleAuthReady(); 
         }
