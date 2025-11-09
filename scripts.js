@@ -1,9 +1,17 @@
+// --- FIREBASE SETUP ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { 
+    getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, 
+    setPersistence, browserSessionPersistence 
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { 
+    getFirestore, collection, doc, setDoc, getDoc, 
+    query, where, addDoc, getDocs, onSnapshot, 
+    serverTimestamp, setLogLevel 
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// --- YOUR FIREBASE CONFIGURATION (USED AS FALLBACK FOR GITHUB PAGES) ---
-const hardcodedFirebaseConfig = {
+// Your embedded Firebase configuration
+const userProvidedFirebaseConfig = {
     apiKey: "AIzaSyDJQbgJK4GpvmLEchh0-2mWjrUW3ZAN2QI",
     authDomain: "ev-charger-monitor-85a48.firebaseapp.com",
     projectId: "ev-charger-monitor-85a48",
@@ -12,66 +20,83 @@ const hardcodedFirebaseConfig = {
     appId: "1:22222071413:web:d5a26ffd2a9014cc10fa3c",
     measurementId: "G-PYKSBZ6XHW"
 };
-// --------------------------------------------------------------------------
 
+// Global variables provided by the environment (Canvas)
+const envAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-ev-app';
+const envFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+const envAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-// --- MANDATORY PLATFORM GLOBAL VARIABLES ---
-// We prioritize the environment's config, falling back to the hardcoded config for GitHub Pages deployment.
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : hardcodedFirebaseConfig;
-
-// Use the environment's app ID or fallback to the projectId from the hardcoded config.
-const appId = typeof __app_id !== 'undefined' ? __app_id : hardcodedFirebaseConfig.projectId;
-
-const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+// Determine which config to use (Environment config preferred, fallback to hardcoded)
+const firebaseConfig = envFirebaseConfig || userProvidedFirebaseConfig;
+const appId = envAppId; 
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+export const db = getFirestore(app);
+export const auth = getAuth(app);
 
-// Enable Firestore logging for debugging
-setLogLevel('debug'); 
+// Enable debug logging for Firestore (useful for troubleshooting)
+setLogLevel('debug');
 
-let currentUserId = null;
-let isAuthReady = false;
+// --- EXPORTED STATE ---
+export let isAuthReady = false;
+export let currentUserId = null;
 
-// Authenticate the user and set up the global user ID
+/**
+ * Authenticates the user using a custom token (if available) or anonymously.
+ * Also sets up the global exports and dispatches a custom event when ready.
+ */
 async function authenticateUser() {
     try {
-        if (initialAuthToken) {
-            await signInWithCustomToken(auth, initialAuthToken);
+        // Use Session persistence to keep the user logged in across page reloads
+        await setPersistence(auth, browserSessionPersistence);
+        
+        let userCredential;
+        
+        if (envAuthToken) {
+            // 1. Sign in using the Canvas provided custom token
+            userCredential = await signInWithCustomToken(auth, envAuthToken);
         } else {
-            // Sign in anonymously if no custom token is provided
-            await signInAnonymously(auth);
+            // 2. Sign in anonymously (for GitHub Pages deployment)
+            userCredential = await signInAnonymously(auth);
         }
+
+        // Set global state and mark authentication as complete
+        currentUserId = userCredential.user.uid;
+        isAuthReady = true;
+
+        console.log(`Firebase: User authenticated. UID: ${currentUserId}`);
+
     } catch (error) {
-        console.error("Authentication Error:", error);
+        console.error("Firebase Authentication Error:", error);
+        
+        // Fallback to anonymous sign-in if custom token fails
+        try {
+            const anonymousUserCredential = await signInAnonymously(auth);
+            currentUserId = anonymousUserCredential.user.uid;
+            isAuthReady = true;
+            console.log(`Firebase: Failed custom token, signed in anonymously. UID: ${currentUserId}`);
+        } catch (anonError) {
+            console.error("Firebase Critical Error: Cannot sign in anonymously.", anonError);
+            currentUserId = 'anonymous-' + crypto.randomUUID();
+            isAuthReady = true; // Mark as ready even with fallback ID to allow UI to proceed
+        }
+    } finally {
+        // Dispatch event AFTER state is set, ensuring listeners get the correct state
+        window.dispatchEvent(new Event('authReady'));
     }
 }
 
-// Listen for Auth State Changes
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-        currentUserId = user.uid;
-    } else {
-        // Fallback for non-auth environment, though auth should succeed above
-        currentUserId = crypto.randomUUID(); 
-    }
-    isAuthReady = true;
-    console.log(`Auth Ready. User ID: ${currentUserId}`);
-
-    // Dispatch a custom event once auth is ready so other modules (HTML files) can start Firestore operations
-    window.dispatchEvent(new CustomEvent('authReady'));
-});
-
-// Run authentication immediately
+// Start the authentication process immediately
 authenticateUser();
 
-// Function to get the correct collection reference path
-function getChargingSessionsCollection() {
-    // Public data path required by the platform: /artifacts/{appId}/public/data/collection_name
-    return collection(db, `artifacts/${appId}/public/data/chargingSessions`);
+/**
+ * Gets the reference to the public chargingSessions collection.
+ * Documents are stored in /artifacts/{appId}/public/data/chargingSessions
+ * @returns {import("firebase/firestore").CollectionReference}
+ */
+export function getChargingSessionsCollection() {
+    // Note: The collection path ensures global access as per Firestore security rules
+    const collectionPath = `/artifacts/${appId}/public/data/chargingSessions`;
+    return collection(db, collectionPath);
 }
-
-// Export the necessary objects and variables
-export { db, auth, getChargingSessionsCollection, isAuthReady, currentUserId, signInAnonymously };
