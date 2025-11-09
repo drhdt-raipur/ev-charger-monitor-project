@@ -15,6 +15,8 @@
     th, td { padding: 10px 8px; border: 1px solid #e0e0e0; }
     th { background: #e3eafc; }
     .vehicle { font-weight: 600; }
+    button.stop { background: #dc3545; color: #fff; border: none; padding: 6px 13px; border-radius: 5px; cursor: pointer;}
+    button.stop:hover { background: #a22633; }
   </style>
 </head>
 <body>
@@ -29,6 +31,7 @@
         <th>Amount Paid</th>
         <th>Charging Since</th>
         <th>Duration</th>
+        <th>Action</th>
       </tr>
     </thead>
     <tbody id="sessionsList">
@@ -53,15 +56,15 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // Constants
-    const POWER_PER_SECOND = 0.01; // watts per second per charger
-
+    const POWER_PER_SECOND = 0.01; // watts/second/charger
     let liveSessions = {};
+    let sessionKeys = {};
 
     // Listen for changes in charging_sessions
     db.ref("charging_sessions").on("value", function(snapshot) {
       const data = snapshot.val() || {};
       liveSessions = {};
+      sessionKeys = {};
       Object.keys(data).forEach(key => {
         if (data[key].active) {
           liveSessions[key] = data[key];
@@ -82,28 +85,38 @@
 
       let totalPower = 0;
 
-      Object.values(liveSessions).forEach(sess => {
+      Object.entries(liveSessions).forEach(([key, sess]) => {
         // Duration in seconds
         const since = Number(sess.start_time) || 0;
         const duration = Math.round((now - since) / 1000);
         totalPower += duration * POWER_PER_SECOND;
 
-        // Format
-        const row = `<tr>
+        // Each row now has a Stop button!
+        const row = document.createElement('tr');
+        row.innerHTML = `
           <td class="vehicle">${sess.vehicle_number}</td>
           <td>${sess.amount_paid}</td>
           <td>${new Date(since).toLocaleTimeString()}</td>
           <td>${Math.floor(duration / 60)}m ${duration % 60}s</td>
-        </tr>`;
-        tbody.innerHTML += row;
+          <td><button class="stop" data-key="${key}">Stop</button></td>
+        `;
+        tbody.appendChild(row);
       });
 
-      // Show total power, 2 decimal places
       document.getElementById("powerUsage").innerText = totalPower.toFixed(2);
+
+      // Set event listeners for all Stop buttons
+      Array.from(document.getElementsByClassName('stop')).forEach(button => {
+        button.onclick = function() {
+          const key = this.getAttribute('data-key');
+          if(confirm("Stop charging for this vehicle?")) {
+            db.ref("charging_sessions/" + key).update({active: false});
+          }
+        };
+      });
     }
 
-    // Because power should keep updating live (even if no db update):
-    setInterval(updateDashboard, 1000); // every second update durations and power usage
+    setInterval(updateDashboard, 1000); // keep durations and power live
   </script>
 </body>
 </html>
