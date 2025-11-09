@@ -3,244 +3,418 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live EV Charging Dashboard</title>
-    <!-- Load Tailwind CSS for modern styling -->
+    <title>EV Charger Dashboard</title>
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Custom font and shadow for better aesthetics */
-        body { font-family: 'Inter', sans-serif; background-color: #e2e8f0; }
-        .card { 
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06); 
-            transition: transform 0.2s, box-shadow 0.2s;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .data-card {
+            transition: all 0.3s ease-in-out;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
         }
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+        .status-dot {
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            transition: background-color 0.5s;
         }
+        .charging { background-color: #34D399; } /* Green */
+        .available { background-color: #3B82F6; } /* Blue */
+        .offline { background-color: #F87171; } /* Red */
     </style>
 </head>
-<body class="p-4 md:p-8">
+<body class="bg-gray-50 min-h-screen p-4 md:p-8">
 
-    <div class="max-w-4xl mx-auto">
-        <h1 class="text-4xl font-extrabold text-gray-800 mb-2 border-b pb-2">Live EV Charging Dashboard</h1>
-        <p class="text-gray-600 mb-6">Real-time view of all active charging sessions across the network.</p>
-        
-        <!-- Authentication Status Indicator -->
-        <div id="authStatus" class="mb-4 text-xs text-center p-2 rounded-lg bg-yellow-100 text-yellow-700 font-semibold">
-            Initializing Firebase...
-        </div>
-
-        <!-- Display User ID (Important for collaboration context) -->
-        <div class="mt-4 text-gray-600 text-sm">
-            Current User ID: <span id="displayUserId" class="font-mono text-gray-800">...</span>
-        </div>
-
-        <!-- Session Display Area -->
-        <div id="sessionsList" class="space-y-4 mt-6">
-            <p id="loadingMessage" class="text-center text-gray-500">Connecting to database...</p>
-        </div>
-
-        <p class="text-center text-sm text-gray-400 mt-6">
-            Go to <a href="index.html" class="text-indigo-600 hover:text-indigo-800 font-medium">Input Form</a> to start a new session.
-        </p>
+    <div id="loading-spinner" class="flex justify-center items-center h-screen">
+        <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600"></div>
     </div>
 
-    <script type="module">
-        // --- FIREBASE SDK IMPORTS ---
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getAuth, signInAnonymously, signInWithCustomToken, 
-            setPersistence, browserSessionPersistence 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, collection, query, onSnapshot, 
-            orderBy, setLogLevel 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <div id="app-container" class="hidden max-w-4xl mx-auto">
+        <!-- Header -->
+        <header class="mb-8 p-4 bg-white rounded-xl shadow-lg">
+            <h1 class="text-3xl font-extrabold text-gray-900 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-600 mr-3" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3 14H9v-3H6v-2h3V8h6v3h3v2h-3v3z"/>
+                </svg>
+                EV Charger Monitor
+            </h1>
+            <p class="text-sm text-gray-500 mt-2">
+                User ID: <span id="user-id" class="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">...</span>
+            </p>
+        </header>
 
-        // --- FIREBASE CONFIG & INITIALIZATION (Moved from scripts.js) ---
-        const userProvidedFirebaseConfig = {
-            apiKey: "AIzaSyDJQbgJK4GpvmLEchh0-2mWjrUW3ZAN2QI",
-            authDomain: "ev-charger-monitor-85a48.firebaseapp.com",
-            projectId: "ev-charger-monitor-85a48",
-            storageBucket: "ev-charger-monitor-85a48.firebasestorage.app",
-            messagingSenderId: "22222071413",
-            appId: "1:22222071413:web:d5a26ffd2a9014cc10fa3c",
-            measurementId: "G-PYKSBZ6XHW"
+        <!-- Status Card -->
+        <div class="mb-8 p-6 bg-white rounded-xl data-card border-l-4 border-indigo-600">
+            <div class="flex items-center justify-between">
+                <h2 class="text-2xl font-semibold text-gray-800">Charger Status</h2>
+                <button id="action-button" class="px-6 py-2 rounded-full font-bold text-white transition-all transform hover:scale-105 active:scale-95 shadow-md">
+                    Start Charging
+                </button>
+            </div>
+            <div class="mt-4 flex items-center">
+                <span id="status-dot" class="status-dot mr-3"></span>
+                <span id="charger-status" class="text-4xl font-extrabold text-gray-900">Loading...</span>
+            </div>
+            <p id="session-time" class="text-sm text-gray-500 mt-2">Last Update: ...</p>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- Current Power -->
+            <div class="p-6 bg-white rounded-xl data-card hover:shadow-xl">
+                <p class="text-sm font-medium text-gray-500">Current Power</p>
+                <div class="mt-1 flex items-end">
+                    <span id="current-power" class="text-3xl font-extrabold text-indigo-600">0.0</span>
+                    <span class="ml-2 text-base text-gray-500">kW</span>
+                </div>
+            </div>
+
+            <!-- Energy Delivered -->
+            <div class="p-6 bg-white rounded-xl data-card hover:shadow-xl">
+                <p class="text-sm font-medium text-gray-500">Energy Delivered</p>
+                <div class="mt-1 flex items-end">
+                    <span id="energy-delivered" class="text-3xl font-extrabold text-indigo-600">0.00</span>
+                    <span class="ml-2 text-base text-gray-500">kWh</span>
+                </div>
+            </div>
+
+            <!-- Session Time -->
+            <div class="p-6 bg-white rounded-xl data-card hover:shadow-xl">
+                <p class="text-sm font-medium text-gray-500">Session Duration</p>
+                <div class="mt-1 flex items-end">
+                    <span id="session-duration" class="text-3xl font-extrabold text-indigo-600">00:00:00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charging Log (Simple List) -->
+        <div class="p-6 bg-white rounded-xl data-card">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Live Updates</h3>
+            <ul id="log-list" class="space-y-2 text-sm max-h-48 overflow-y-auto">
+                <li class="text-gray-500">Waiting for data...</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Firebase Scripts and Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Set Firebase logging level for debugging purposes
+        setLogLevel('Debug');
+
+        // Global Firebase variables
+        let app;
+        let db;
+        let auth;
+        let userId = null;
+        let isAuthReady = false;
+
+        // Configuration variables (retrieved from canvas environment)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // DOM elements
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const appContainer = document.getElementById('app-container');
+        const chargerStatusEl = document.getElementById('charger-status');
+        const statusDotEl = document.getElementById('status-dot');
+        const currentPowerEl = document.getElementById('current-power');
+        const energyDeliveredEl = document.getElementById('energy-delivered');
+        const sessionDurationEl = document.getElementById('session-duration');
+        const sessionTimeEl = document.getElementById('session-time');
+        const actionButton = document.getElementById('action-button');
+        const logList = document.getElementById('log-list');
+        const userIdEl = document.getElementById('user-id');
+
+        // --- Utility Functions ---
+
+        /**
+         * Formats seconds into HH:MM:SS
+         * @param {number} totalSeconds
+         * @returns {string}
+         */
+        const formatTime = (totalSeconds) => {
+            const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+            const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+            const s = String(Math.floor(totalSeconds % 60)).padStart(2, '0');
+            return `${h}:${m}:${s}`;
         };
 
-        // Global variables provided by the environment (Canvas)
-        const envAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-ev-app';
-        const envFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const envAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // Determine which config to use
-        const firebaseConfig = envFirebaseConfig || userProvidedFirebaseConfig;
-        const appId = envAppId; 
-
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-
-        // Enable debug logging for Firestore
-        setLogLevel('debug');
-
-        // --- STATE MANAGEMENT ---
-        let isAuthReady = false;
-        let currentUserId = null;
-        
         /**
-         * Gets the reference to the public chargingSessions collection.
+         * Adds a message to the live update log.
+         * @param {string} message
          */
-        function getChargingSessionsCollection() {
-            const collectionPath = `/artifacts/${appId}/public/data/chargingSessions`;
-            return collection(db, collectionPath);
-        }
+        const logUpdate = (message) => {
+            const li = document.createElement('li');
+            li.className = 'text-gray-800 flex items-center';
+            li.innerHTML = `<span class="text-indigo-500 mr-2">•</span> ${new Date().toLocaleTimeString()} - ${message}`;
+            logList.prepend(li);
+            if (logList.children.length > 5) {
+                logList.removeChild(logList.lastChild);
+            }
+        };
 
-        /**
-         * Authenticates the user and dispatches a custom event when ready.
-         */
-        async function authenticateUser() {
+        // --- Charger Data Schema & Paths ---
+
+        const CHARGER_INITIAL_DATA = {
+            status: "Available", // Available | Charging | Offline
+            currentPowerKW: 0.0,
+            energyDeliveredKWh: 0.00,
+            sessionStartTime: null, // ISO string for session start
+            lastUpdated: serverTimestamp()
+        };
+
+        const getChargerDocRef = () => {
+            if (!db || !userId) return null;
+            // Private data path: /artifacts/{appId}/users/{userId}/chargerData/currentCharger
+            return doc(db, 'artifacts', appId, 'users', userId, 'chargerData', 'currentCharger');
+        };
+
+        // --- Firebase Initialization and Auth ---
+
+        const setupFirebase = async () => {
+            if (!firebaseConfig) {
+                console.error("Firebase configuration is missing or invalid.");
+                return;
+            }
+
             try {
-                await setPersistence(auth, browserSessionPersistence);
-                let userCredential;
-                
-                if (envAuthToken) {
-                    userCredential = await signInWithCustomToken(auth, envAuthToken);
-                } else {
-                    userCredential = await signInAnonymously(auth);
-                }
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
 
-                currentUserId = userCredential.user.uid;
-                isAuthReady = true;
-
-                console.log(`Firebase: User authenticated. UID: ${currentUserId}`);
-
-            } catch (error) {
-                console.error("Firebase Authentication Error:", error);
-                
-                try {
-                    const anonymousUserCredential = await signInAnonymously(auth);
-                    currentUserId = anonymousUserCredential.user.uid;
+                // 1. Handle Authentication
+                // onAuthStateChanged will fire once the auth state is determined
+                onAuthStateChanged(auth, async (user) => {
                     isAuthReady = true;
-                    console.log(`Firebase: Failed token, signed in anonymously. UID: ${currentUserId}`);
-                } catch (anonError) {
-                    console.error("Firebase Critical Error: Cannot sign in anonymously.", anonError);
-                    currentUserId = 'anonymous-' + crypto.randomUUID();
-                    isAuthReady = true;
-                }
-            } finally {
-                window.dispatchEvent(new Event('authReady'));
-            }
-        }
-        // Start the authentication process immediately
-        authenticateUser();
-        // --- END CORE FIREBASE LOGIC ---
-
-        const sessionsList = document.getElementById('sessionsList');
-        const loadingMessage = document.getElementById('loadingMessage');
-        const authStatus = document.getElementById('authStatus');
-        const displayUserId = document.getElementById('displayUserId');
-
-        /**
-         * Renders the list of charging sessions into the DOM.
-         * @param {Array<Object>} sessions - The list of session data retrieved from Firestore.
-         */
-        function renderSessions(sessions) {
-            sessionsList.innerHTML = ''; // Clear existing list
-            
-            if (sessions.length === 0) {
-                sessionsList.innerHTML = '<p class="text-center text-2xl py-10 text-gray-400 border-2 border-dashed rounded-xl mt-8">🔋 No active charging sessions found.</p>';
-                return;
-            }
-
-            sessions.forEach(session => {
-                // Format the timestamp for display
-                const date = session.startTime ? new Date(session.startTime).toLocaleString() : 'N/A (Pending)';
-                
-                const sessionCard = document.createElement('div');
-                sessionCard.className = 'bg-white p-5 rounded-xl card border-l-4 border-indigo-500 hover:shadow-lg transition duration-200';
-                
-                // Card content using the session data
-                sessionCard.innerHTML = `
-                    <div class="flex justify-between items-start">
-                        <h2 class="text-2xl font-bold text-gray-900">${session.vehicleNumber}</h2>
-                        <span class="text-sm font-medium text-white px-3 py-1 rounded-full bg-green-600">${session.status.toUpperCase()}</span>
-                    </div>
-                    <div class="mt-3 text-gray-700 space-y-1 text-sm">
-                        <p><strong>Amount Paid:</strong> <span class="text-lg font-semibold text-indigo-600">₹${session.amountPaid.toFixed(2)}</span></p>
-                        <p><strong>Start Time:</strong> ${date}</p>
-                        <p class="text-xs text-gray-500 mt-2"><strong>Session ID:</strong> <span class="font-mono">${session.id}</span></p>
-                        <p class="text-xs text-gray-500"><strong>Initiated By:</strong> <span class="font-mono">${session.userId}</span></p>
-                    </div>
-                `;
-                sessionsList.appendChild(sessionCard);
-            });
-        }
-
-        /**
-         * Sets up the Firestore real-time listener to fetch and update sessions.
-         */
-        function setupRealtimeListener() {
-            if (!isAuthReady || !currentUserId) {
-                return;
-            }
-
-            const sessionsColRef = getChargingSessionsCollection();
-            
-            // Create a query: Get all documents, ordered by start time descending
-            const q = query(sessionsColRef, orderBy('startTime', 'desc'));
-
-            // onSnapshot sets up the real-time listener
-            const unsubscribe = onSnapshot(q, (snapshot) => {
-                loadingMessage.style.display = 'none'; // Hide loading message
-                
-                const sessions = [];
-                snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    
-                    if (doc.id === '_placeholder' && data._placeholder === true) {
-                        return;
+                    if (user) {
+                        userId = user.uid;
+                        console.log("Authenticated with UID:", userId);
+                    } else {
+                        // Attempt to sign in anonymously if auth failed or no token was provided
+                        await signInAnonymously(auth);
                     }
-
-                    const startTimeMs = data.startTime && typeof data.startTime.toMillis === 'function' 
-                                      ? data.startTime.toMillis() 
-                                      : null; 
-                    
-                    sessions.push({
-                        id: doc.id,
-                        startTime: startTimeMs,
-                        ...data
-                    });
+                    // Start listening for data ONLY after auth is ready
+                    if (userId) {
+                        userIdEl.textContent = userId;
+                        initializeCharger();
+                        subscribeToChargerUpdates();
+                    } else {
+                        console.warn("Could not determine user ID. Trying again...");
+                    }
                 });
 
-                renderSessions(sessions);
-            }, (error) => {
-                console.error("Firestore listener error:", error);
-                sessionsList.innerHTML = `<p class="text-center text-xl text-red-600 p-4 border border-red-300 rounded-lg">❌ Error loading data: ${error.message}</p>`;
-            });
+                // Use custom token if available (provided by the canvas environment)
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    // Sign in anonymously as a fallback if no token is present
+                    await signInAnonymously(auth);
+                }
 
-            // Clean up the listener when the page is unloaded
-            window.onbeforeunload = unsubscribe;
-        }
+            } catch (error) {
+                console.error("Error during Firebase setup or sign-in:", error);
+                loadingSpinner.innerHTML = '<p class="text-red-600">Error loading app. Check console for details.</p>';
+            }
+        };
+
+        // --- Data Handling ---
 
         /**
-         * Handles the custom 'authReady' event.
+         * Initializes the charger document if it doesn't exist.
          */
-        function handleAuthReady() {
-            authStatus.textContent = `Status: Authenticated. User ID starts with ${currentUserId.substring(0, 8)}...`;
-            authStatus.classList.remove('bg-yellow-100', 'text-yellow-700');
-            authStatus.classList.add('bg-green-100', 'text-green-700');
-            displayUserId.textContent = currentUserId;
-            
-            setupRealtimeListener();
-        }
+        const initializeCharger = async () => {
+            const chargerRef = getChargerDocRef();
+            if (!chargerRef) return;
+            try {
+                // Set the initial state without overwriting existing data if it's there
+                await setDoc(chargerRef, CHARGER_INITIAL_DATA, { merge: true });
+                logUpdate('Charger state initialized.');
+            } catch (e) {
+                console.error("Error initializing charger document: ", e);
+            }
+        };
 
-        window.addEventListener('authReady', handleAuthReady);
-        
-        if (isAuthReady) {
-             handleAuthReady(); 
-        }
+        /**
+         * Updates the UI based on the latest Firestore data.
+         * @param {object} data
+         */
+        const updateUI = (data) => {
+            const { status, currentPowerKW, energyDeliveredKWh, sessionStartTime, lastUpdated } = data;
+
+            // 1. Status and Dot
+            chargerStatusEl.textContent = status;
+            statusDotEl.className = `status-dot mr-3 ${status.toLowerCase()}`;
+
+            // 2. Metrics
+            currentPowerEl.textContent = currentPowerKW.toFixed(1);
+            energyDeliveredEl.textContent = energyDeliveredKWh.toFixed(2);
+
+            // 3. Action Button
+            actionButton.classList.remove('bg-green-500', 'bg-red-500', 'bg-blue-500');
+            actionButton.disabled = false;
+
+            if (status === 'Charging') {
+                actionButton.textContent = 'Stop Charging';
+                actionButton.classList.add('bg-red-500');
+            } else if (status === 'Available') {
+                actionButton.textContent = 'Start Charging';
+                actionButton.classList.add('bg-green-500');
+            } else { // Offline
+                actionButton.textContent = 'Offline';
+                actionButton.classList.add('bg-gray-500');
+                actionButton.disabled = true;
+            }
+
+            // 4. Time and Duration
+            if (sessionStartTime) {
+                const startTime = new Date(sessionStartTime);
+                const now = new Date();
+                const durationSeconds = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+                sessionDurationEl.textContent = formatTime(durationSeconds);
+                sessionTimeEl.textContent = `Session started: ${startTime.toLocaleString()}`;
+            } else {
+                sessionDurationEl.textContent = '00:00:00';
+                sessionTimeEl.textContent = `Last Update: ${lastUpdated ? new Date(lastUpdated.toDate()).toLocaleString() : 'N/A'}`;
+            }
+
+            logUpdate(`Status updated: ${status}`);
+        };
+
+        let intervalId = null;
+
+        /**
+         * Starts a simulation of data updates while charging.
+         * @param {string} sessionStartTime
+         */
+        const startSimulation = (sessionStartTime) => {
+            if (intervalId) clearInterval(intervalId);
+
+            let totalEnergy = 0;
+            const powerKW = 7.2; // Constant power draw for simulation
+
+            const updateDuration = () => {
+                const startTime = new Date(sessionStartTime);
+                const now = new Date();
+                const durationSeconds = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+                sessionDurationEl.textContent = formatTime(durationSeconds);
+
+                // Simulate data increment every second
+                totalEnergy += powerKW / 3600; // kWh per second
+
+                // Update Firestore document with new simulated metrics
+                const chargerRef = getChargerDocRef();
+                if (chargerRef) {
+                    setDoc(chargerRef, {
+                        currentPowerKW: powerKW,
+                        energyDeliveredKWh: totalEnergy,
+                        lastUpdated: serverTimestamp()
+                    }, { merge: true }).catch(e => console.error("Error simulating update:", e));
+                }
+            };
+
+            updateDuration(); // Initial update
+            intervalId = setInterval(updateDuration, 1000);
+        };
+
+        const stopSimulation = () => {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+        };
+
+        /**
+         * Subscribes to real-time updates from Firestore.
+         */
+        const subscribeToChargerUpdates = () => {
+            const chargerRef = getChargerDocRef();
+            if (!chargerRef) {
+                console.error("Cannot subscribe: Charger document reference is null.");
+                return;
+            }
+
+            onSnapshot(chargerRef, (docSnap) => {
+                loadingSpinner.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    updateUI(data);
+
+                    if (data.status === 'Charging' && data.sessionStartTime) {
+                        // Start simulation/duration counter if charging
+                        startSimulation(data.sessionStartTime);
+                    } else {
+                        // Stop simulation/duration counter if not charging
+                        stopSimulation();
+                    }
+                } else {
+                    // Document doesn't exist, create it (should be covered by initializeCharger)
+                    console.log("Document does not exist. Initializing...");
+                    setDoc(chargerRef, CHARGER_INITIAL_DATA).catch(e => console.error("Error setting initial doc:", e));
+                }
+            }, (error) => {
+                console.error("Error subscribing to charger updates:", error);
+                logUpdate('Error fetching data.');
+            });
+        };
+
+        // --- Event Listener for Action Button ---
+
+        actionButton.addEventListener('click', async () => {
+            actionButton.disabled = true;
+            const currentStatus = chargerStatusEl.textContent;
+            const chargerRef = getChargerDocRef();
+
+            if (!chargerRef) {
+                console.error("Cannot perform action: Charger document reference is null.");
+                actionButton.disabled = false;
+                return;
+            }
+
+            try {
+                if (currentStatus === 'Available') {
+                    // Start Charging
+                    await setDoc(chargerRef, {
+                        status: "Charging",
+                        sessionStartTime: new Date().toISOString(),
+                        currentPowerKW: 7.2, // Start with non-zero power
+                        energyDeliveredKWh: 0.00,
+                        lastUpdated: serverTimestamp()
+                    }, { merge: true });
+                    logUpdate('Charging session started.');
+
+                } else if (currentStatus === 'Charging') {
+                    // Stop Charging
+                    await setDoc(chargerRef, {
+                        status: "Available",
+                        sessionStartTime: null,
+                        currentPowerKW: 0.0,
+                        // Keep energyDeliveredKWh to show total charged
+                        lastUpdated: serverTimestamp()
+                    }, { merge: true });
+                    logUpdate('Charging session stopped.');
+
+                }
+            } catch (e) {
+                console.error("Error updating charger status:", e);
+                logUpdate('Failed to update status due to an error.');
+            } finally {
+                // Button re-enabled by onSnapshot update
+            }
+        });
+
+        // Start the application setup
+        window.onload = setupFirebase;
+
     </script>
 </body>
 </html>
