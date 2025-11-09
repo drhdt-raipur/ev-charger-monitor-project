@@ -3,76 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EV Charger Interface - Start Session</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <title>Start EV Charging Session</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .container { background-color: #ffffff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); width: 100%; max-width: 400px; }
-        h2 { text-align: center; color: #333; margin-bottom: 30px; }
-        label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
-        input[type="text"], input[type="number"] { width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { background-color: #28a745; color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; transition: background-color 0.3s; }
-        button:hover { background-color: #218838; }
-        #message { text-align: center; margin-top: 20px; font-weight: bold; }
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        .container-card { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05); }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h2>⚡ EV Charging Station</h2>
-        <form id="chargeForm">
-            <label for="vehicleNumber">Vehicle Number:</label>
-            <input type="text" id="vehicleNumber" required placeholder="e.g., MH12AB1234">
+<body class="flex items-center justify-center min-h-screen p-4">
 
-            <label for="amountPaid">Amount Paid (₹):</label>
-            <input type="number" id="amountPaid" min="10" step="0.01" required placeholder="Minimum ₹10">
+    <div class="w-full max-w-md bg-white p-8 rounded-xl container-card">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Start Charging Session</h1>
+        <p class="text-gray-500 mb-6">Enter vehicle and payment details to begin.</p>
+        
+        <div id="authStatus" class="mb-4 text-xs text-center p-2 rounded-lg bg-yellow-100 text-yellow-700 font-semibold">
+            Initializing Firebase...
+        </div>
 
-            <button type="submit">Start Charging Session</button>
+        <div class="mt-4 text-gray-600 text-sm mb-6">
+            Current User ID: <span id="displayUserId" class="font-mono text-gray-800">...</span>
+        </div>
+
+        <form id="sessionForm" class="space-y-4">
+            <div>
+                <label for="vehicleNumber" class="block text-sm font-medium text-gray-700 mb-1">Vehicle Registration Number</label>
+                <input type="text" id="vehicleNumber" required
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 uppercase"
+                       placeholder="e.g., MH12AB1234">
+            </div>
+
+            <div>
+                <label for="amountPaid" class="block text-sm font-medium text-gray-700 mb-1">Amount Paid (₹)</label>
+                <input type="number" id="amountPaid" required min="1" step="0.01"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                       placeholder="50.00">
+            </div>
+
+            <button type="submit" id="submitButton"
+                    class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition duration-150 ease-in-out disabled:opacity-50"
+                    disabled>
+                Start Charging
+            </button>
         </form>
-        <p id="message"></p>
-        <p style="text-align: center; margin-top: 15px;">
-            <a href="dashboard.html">View Live Dashboard</a>
+
+        <!-- Message Modal Area (replaces alert/confirm) -->
+        <div id="messageContainer" class="mt-6 hidden">
+            <div id="messageBox" class="p-4 rounded-lg text-center font-medium"></div>
+        </div>
+
+        <p class="text-center text-sm text-gray-400 mt-6">
+            View <a href="dashboard.html" class="text-indigo-600 hover:text-indigo-800 font-medium">Live Dashboard</a>
         </p>
+
     </div>
 
     <script type="module">
-        // Import the sessionsRef from the shared script
-        import { sessionsRef } from './scripts.js';
+        // Import necessary components from our local script and the Firebase CDN
+        import { getChargingSessionsCollection, isAuthReady, currentUserId, db } from 'scripts.js';
+        import { addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const form = document.getElementById('chargeForm');
-        const message = document.getElementById('message');
+        const sessionForm = document.getElementById('sessionForm');
+        const submitButton = document.getElementById('submitButton');
+        const messageContainer = document.getElementById('messageContainer');
+        const messageBox = document.getElementById('messageBox');
+        const authStatus = document.getElementById('authStatus');
+        const displayUserId = document.getElementById('displayUserId');
+        
+        let isSaving = false;
 
-        form.addEventListener('submit', function(e) {
-            e.preventDefault(); // Stop the form from reloading the page
+        /** Displays a custom message to the user. */
+        function showMessage(message, isSuccess = true) {
+            messageBox.textContent = message;
+            messageContainer.classList.remove('hidden');
+            messageBox.className = 'p-4 rounded-lg text-center font-medium'; // Reset classes
+
+            if (isSuccess) {
+                messageBox.classList.add('bg-green-100', 'text-green-700');
+            } else {
+                messageBox.classList.add('bg-red-100', 'text-red-700');
+            }
+            
+            // Auto-hide message after 4 seconds
+            setTimeout(() => {
+                messageContainer.classList.add('hidden');
+            }, 4000);
+        }
+
+        /** Handles the form submission to save data to Firestore. */
+        sessionForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!isAuthReady || isSaving) return;
+            
+            isSaving = true;
+            submitButton.disabled = true;
+            submitButton.textContent = 'Starting Session...';
 
             const vehicleNumber = document.getElementById('vehicleNumber').value.toUpperCase().trim();
             const amountPaid = parseFloat(document.getElementById('amountPaid').value);
-            const startTime = Date.now(); // Get the current time as a Unix timestamp
 
-            if (!vehicleNumber || isNaN(amountPaid) || amountPaid < 10) {
-                message.textContent = 'Please enter a valid Vehicle Number and Amount Paid (min ₹10).';
-                message.style.color = 'red';
+            if (!vehicleNumber || isNaN(amountPaid) || amountPaid <= 0) {
+                showMessage("Please enter a valid vehicle number and amount.", false);
+                isSaving = false;
+                submitButton.disabled = false;
+                submitButton.textContent = 'Start Charging';
                 return;
             }
 
-            // Create a new unique entry in the 'chargingSessions' node
-            // .push() creates a new unique key for the session
-            sessionsRef.push({
-                vehicleNumber: vehicleNumber,
-                amountPaid: amountPaid,
-                startTime: startTime
-            })
-            .then(() => {
-                message.textContent = `✅ Session for ${vehicleNumber} started successfully!`;
-                message.style.color = 'green';
-                form.reset(); // Clear the form
-            })
-            .catch(error => {
-                message.textContent = `❌ Error starting session: ${error.message}`;
-                message.style.color = 'red';
-                console.error("Firebase write error: ", error);
-            });
+            try {
+                const sessionsColRef = getChargingSessionsCollection();
+                
+                const newSession = {
+                    vehicleNumber: vehicleNumber,
+                    amountPaid: amountPaid,
+                    startTime: serverTimestamp(), // Use server timestamp for accuracy
+                    userId: currentUserId,
+                    status: 'active'
+                };
+
+                // Add a new document with an auto-generated ID
+                await addDoc(sessionsColRef, newSession);
+
+                showMessage(`Session started for ${vehicleNumber}! Check the dashboard.`, true);
+                sessionForm.reset();
+
+            } catch (error) {
+                console.error("Error adding document: ", error);
+                showMessage(`Failed to start session: ${error.message}`, false);
+            } finally {
+                isSaving = false;
+                submitButton.disabled = false;
+                submitButton.textContent = 'Start Charging';
+            }
         });
+        
+        /** Handles the custom 'authReady' event dispatched by scripts.js. */
+        function handleAuthReady() {
+            // Update UI to reflect successful authentication
+            authStatus.textContent = `Status: Authenticated. User ID starts with ${currentUserId.substring(0, 8)}...`;
+            authStatus.classList.remove('bg-yellow-100', 'text-yellow-700');
+            authStatus.classList.add('bg-green-100', 'text-green-700');
+            displayUserId.textContent = currentUserId;
+            submitButton.disabled = false; // Enable the submit button
+        }
+
+        // Wait for the custom event fired by scripts.js
+        window.addEventListener('authReady', handleAuthReady);
+        
+        // Check if authentication might have completed before the listener was attached
+        if (isAuthReady) {
+             handleAuthReady(); 
+        }
+
     </script>
 </body>
 </html>
