@@ -46,9 +46,96 @@
     </div>
 
     <script type="module">
-        // The import statement is simplified to 'scripts.js' to fix module resolution errors.
-        import { getChargingSessionsCollection, isAuthReady, currentUserId } from 'scripts.js';
-        import { query, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // --- FIREBASE SDK IMPORTS ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, signInAnonymously, signInWithCustomToken, 
+            setPersistence, browserSessionPersistence 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, collection, query, onSnapshot, 
+            orderBy, setLogLevel 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- FIREBASE CONFIG & INITIALIZATION (Moved from scripts.js) ---
+        const userProvidedFirebaseConfig = {
+            apiKey: "AIzaSyDJQbgJK4GpvmLEchh0-2mWjrUW3ZAN2QI",
+            authDomain: "ev-charger-monitor-85a48.firebaseapp.com",
+            projectId: "ev-charger-monitor-85a48",
+            storageBucket: "ev-charger-monitor-85a48.firebasestorage.app",
+            messagingSenderId: "22222071413",
+            appId: "1:22222071413:web:d5a26ffd2a9014cc10fa3c",
+            measurementId: "G-PYKSBZ6XHW"
+        };
+
+        // Global variables provided by the environment (Canvas)
+        const envAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-ev-app';
+        const envFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const envAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Determine which config to use
+        const firebaseConfig = envFirebaseConfig || userProvidedFirebaseConfig;
+        const appId = envAppId; 
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Enable debug logging for Firestore
+        setLogLevel('debug');
+
+        // --- STATE MANAGEMENT ---
+        let isAuthReady = false;
+        let currentUserId = null;
+        
+        /**
+         * Gets the reference to the public chargingSessions collection.
+         */
+        function getChargingSessionsCollection() {
+            const collectionPath = `/artifacts/${appId}/public/data/chargingSessions`;
+            return collection(db, collectionPath);
+        }
+
+        /**
+         * Authenticates the user and dispatches a custom event when ready.
+         */
+        async function authenticateUser() {
+            try {
+                await setPersistence(auth, browserSessionPersistence);
+                let userCredential;
+                
+                if (envAuthToken) {
+                    userCredential = await signInWithCustomToken(auth, envAuthToken);
+                } else {
+                    userCredential = await signInAnonymously(auth);
+                }
+
+                currentUserId = userCredential.user.uid;
+                isAuthReady = true;
+
+                console.log(`Firebase: User authenticated. UID: ${currentUserId}`);
+
+            } catch (error) {
+                console.error("Firebase Authentication Error:", error);
+                
+                try {
+                    const anonymousUserCredential = await signInAnonymously(auth);
+                    currentUserId = anonymousUserCredential.user.uid;
+                    isAuthReady = true;
+                    console.log(`Firebase: Failed token, signed in anonymously. UID: ${currentUserId}`);
+                } catch (anonError) {
+                    console.error("Firebase Critical Error: Cannot sign in anonymously.", anonError);
+                    currentUserId = 'anonymous-' + crypto.randomUUID();
+                    isAuthReady = true;
+                }
+            } finally {
+                window.dispatchEvent(new Event('authReady'));
+            }
+        }
+        // Start the authentication process immediately
+        authenticateUser();
+        // --- END CORE FIREBASE LOGIC ---
 
         const sessionsList = document.getElementById('sessionsList');
         const loadingMessage = document.getElementById('loadingMessage');
@@ -95,7 +182,6 @@
          * Sets up the Firestore real-time listener to fetch and update sessions.
          */
         function setupRealtimeListener() {
-            // Guard clause: ensure authentication is ready before querying Firestore
             if (!isAuthReady || !currentUserId) {
                 return;
             }
@@ -113,13 +199,10 @@
                 snapshot.forEach((doc) => {
                     const data = doc.data();
                     
-                    // Filter out the placeholder document
                     if (doc.id === '_placeholder' && data._placeholder === true) {
                         return;
                     }
 
-                    // Convert Firestore Timestamp object to JavaScript milliseconds for display
-                    // The 'toMillis' function is only present on resolved server timestamps.
                     const startTimeMs = data.startTime && typeof data.startTime.toMillis === 'function' 
                                       ? data.startTime.toMillis() 
                                       : null; 
@@ -142,23 +225,19 @@
         }
 
         /**
-         * Handles the custom 'authReady' event dispatched by scripts.js.
+         * Handles the custom 'authReady' event.
          */
         function handleAuthReady() {
-            // Update UI to reflect successful authentication
             authStatus.textContent = `Status: Authenticated. User ID starts with ${currentUserId.substring(0, 8)}...`;
             authStatus.classList.remove('bg-yellow-100', 'text-yellow-700');
             authStatus.classList.add('bg-green-100', 'text-green-700');
             displayUserId.textContent = currentUserId;
             
-            // Start listening for data once authenticated
             setupRealtimeListener();
         }
 
-        // 1. Wait for the custom event fired by scripts.js before starting the listener
         window.addEventListener('authReady', handleAuthReady);
         
-        // 2. Immediate check: If scripts.js loaded faster and already set the flag, run the handler immediately.
         if (isAuthReady) {
              handleAuthReady(); 
         }
