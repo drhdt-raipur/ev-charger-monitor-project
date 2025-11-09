@@ -1,307 +1,109 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Responsive Dashboard</title>
-    <!-- Load Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Chart.js for visualization -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
-    <style>
-        /* Custom scrollbar styling for a cleaner look */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-thumb {
-            background-color: #cbd5e1; /* slate-300 */
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f5f9; /* slate-100 */
-        }
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f1f5f9; /* slate-100 */
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>EV Charger Monitoring Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.8/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.8/firebase-database-compat.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 24px; background: #f8f8f8; }
+    h1 { color: #2c387e; }
+    .stat { font-size: 1.15em; margin-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 10px 8px; border: 1px solid #e0e0e0; }
+    th { background: #e3eafc; }
+    .vehicle { font-weight: 600; }
+  </style>
 </head>
-<body class="flex min-h-screen">
+<body>
+  <h1>EV Charger Dashboard</h1>
+  <div class="stat">Chargers Online: <span id="onlineNum">0</span></div>
+  <div class="stat">Total Power Used (Watt): <span id="powerUsage">0.00</span></div>
+  <div class="stat">Live Charging Sessions:</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Vehicle Number</th>
+        <th>Amount Paid</th>
+        <th>Charging Since</th>
+        <th>Duration</th>
+      </tr>
+    </thead>
+    <tbody id="sessionsList">
+      <!-- Live data here -->
+    </tbody>
+  </table>
 
-    <!-- Sidebar (Hidden on Mobile, shown on Large Screens) -->
-    <aside id="sidebar" class="fixed z-20 h-full w-64 bg-white shadow-xl transition-transform duration-300 ease-in-out transform -translate-x-full lg:translate-x-0">
-        <div class="p-6">
-            <h1 class="text-3xl font-extrabold text-blue-600 tracking-wider">ProjectFlow</h1>
-        </div>
-        <nav class="mt-8 px-4 space-y-2">
-            <a href="#" class="flex items-center space-x-3 p-3 rounded-xl text-white bg-blue-600 font-semibold hover:bg-blue-700 transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
-                <span>Dashboard</span>
-            </a>
-            <a href="#" class="flex items-center space-x-3 p-3 rounded-xl text-gray-600 hover:bg-gray-100 transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20v-2c0-.656-.126-1.283-.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656-.126-1.283-.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                <span>Users</span>
-            </a>
-            <a href="#" class="flex items-center space-x-3 p-3 rounded-xl text-gray-600 hover:bg-gray-100 transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v14L9 19zm0 0v-6m0 6l12-3"></path></svg>
-                <span>Reports</span>
-            </a>
-            <a href="#" class="flex items-center space-x-3 p-3 rounded-xl text-gray-600 hover:bg-gray-100 transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.545.334 1.25.427 1.954.21"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                <span>Settings</span>
-            </a>
-        </nav>
-    </aside>
+  <script>
+    // Your Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDJQbgJK4GpvmLEchh0-2mWjrUW3ZAN2QI",
+      authDomain: "ev-charger-monitor-85a48.firebaseapp.com",
+      projectId: "ev-charger-monitor-85a48",
+      storageBucket: "ev-charger-monitor-85a48.firebasestorage.app",
+      messagingSenderId: "22222071413",
+      appId: "1:22222071413:web:d5a26ffd2a9014cc10fa3c",
+      measurementId: "G-PYKSBZ6XHW",
+      databaseURL: "https://ev-charger-monitor-85a48-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
 
-    <!-- Overlay for mobile sidebar -->
-    <div id="sidebar-overlay" class="fixed inset-0 bg-black opacity-0 z-10 lg:hidden pointer-events-none transition-opacity duration-300"></div>
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-    <!-- Main Content Wrapper -->
-    <div class="flex-1 lg:ml-64 p-4 lg:p-8">
+    // Constants
+    const POWER_PER_SECOND = 0.01; // watts per second per charger
 
-        <!-- Header/Top Bar -->
-        <header class="flex justify-between items-center py-4 px-2 mb-6 bg-white shadow-md rounded-xl">
-            <!-- Mobile Menu Button -->
-            <button id="menu-btn" class="p-2 rounded-lg lg:hidden text-gray-700 hover:bg-gray-100 transition">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-            </button>
-            <h2 class="text-2xl font-bold text-gray-800 hidden sm:block">Analytics Overview</h2>
-            <div class="flex items-center space-x-4">
-                <div class="relative">
-                    <input type="text" placeholder="Search..." class="py-2 px-4 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition w-32 sm:w-64">
-                    <svg class="w-5 h-5 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                </div>
-                <button class="p-2 rounded-full text-gray-600 hover:bg-gray-100 transition">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.405L4 17h5m6 0v1a3 3 0 11-6 0v-1"></path></svg>
-                </button>
-                <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-sm font-semibold text-gray-700">JD</div>
-            </div>
-        </header>
+    let liveSessions = {};
 
-        <!-- Key Metrics Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <!-- Card 1: Total Users -->
-            <div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-blue-500">
-                <p class="text-sm font-medium text-gray-500">Total Users</p>
-                <div class="flex items-center justify-between mt-1">
-                    <p class="text-3xl font-bold text-gray-900">14,208</p>
-                    <span class="text-green-500 text-sm font-semibold flex items-center">
-                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>
-                        12.5%
-                    </span>
-                </div>
-            </div>
-            <!-- Card 2: Revenue -->
-            <div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-green-500">
-                <p class="text-sm font-medium text-gray-500">Total Revenue</p>
-                <div class="flex items-center justify-between mt-1">
-                    <p class="text-3xl font-bold text-gray-900">$87,900</p>
-                    <span class="text-green-500 text-sm font-semibold flex items-center">
-                         <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>
-                        4.1%
-                    </span>
-                </div>
-            </div>
-            <!-- Card 3: Pending Tasks -->
-            <div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-yellow-500">
-                <p class="text-sm font-medium text-gray-500">Pending Tasks</p>
-                <div class="flex items-center justify-between mt-1">
-                    <p class="text-3xl font-bold text-gray-900">45</p>
-                    <span class="text-red-500 text-sm font-semibold flex items-center">
-                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
-                        -2.1%
-                    </span>
-                </div>
-            </div>
-            <!-- Card 4: New Signups -->
-            <div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-purple-500">
-                <p class="text-sm font-medium text-gray-500">New Signups (7D)</p>
-                <div class="flex items-center justify-between mt-1">
-                    <p class="text-3xl font-bold text-gray-900">980</p>
-                    <span class="text-green-500 text-sm font-semibold flex items-center">
-                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>
-                        8.9%
-                    </span>
-                </div>
-            </div>
-        </div>
+    // Listen for changes in charging_sessions
+    db.ref("charging_sessions").on("value", function(snapshot) {
+      const data = snapshot.val() || {};
+      liveSessions = {};
+      Object.keys(data).forEach(key => {
+        if (data[key].active) {
+          liveSessions[key] = data[key];
+        }
+      });
+      updateDashboard();
+    });
 
-        <!-- Charts and Activity Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Main Chart Area -->
-            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
-                <h3 class="text-xl font-semibold text-gray-800 mb-4">User Growth Over 6 Months</h3>
-                <div class="h-80">
-                    <canvas id="userGrowthChart"></canvas>
-                </div>
-            </div>
+    function updateDashboard() {
+      // Update charger count
+      const numOnline = Object.keys(liveSessions).length;
+      document.getElementById("onlineNum").innerText = numOnline;
 
-            <!-- Recent Activity/Feed -->
-            <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg">
-                <h3 class="text-xl font-semibold text-gray-800 mb-4">Recent Activity</h3>
-                <div class="space-y-4 max-h-96 overflow-y-auto">
-                    <!-- Activity Item 1 -->
-                    <div class="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition">
-                        <div class="w-2 h-2 mt-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                        <div class="flex-1">
-                            <p class="text-sm text-gray-800 font-medium">New feature deployed to Production.</p>
-                            <p class="text-xs text-gray-500">2 hours ago</p>
-                        </div>
-                    </div>
-                    <!-- Activity Item 2 -->
-                    <div class="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition">
-                        <div class="w-2 h-2 mt-2 bg-green-500 rounded-full flex-shrink-0"></div>
-                        <div class="flex-1">
-                            <p class="text-sm text-gray-800 font-medium">Payment received from Acme Corp.</p>
-                            <p class="text-xs text-gray-500">5 hours ago</p>
-                        </div>
-                    </div>
-                    <!-- Activity Item 3 -->
-                    <div class="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition">
-                        <div class="w-2 h-2 mt-2 bg-yellow-500 rounded-full flex-shrink-0"></div>
-                        <div class="flex-1">
-                            <p class="text-sm text-gray-800 font-medium">4 bugs reported by QA team.</p>
-                            <p class="text-xs text-gray-500">Yesterday at 10:30 AM</p>
-                        </div>
-                    </div>
-                    <!-- Activity Item 4 -->
-                    <div class="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-500 transition">
-                        <div class="w-2 h-2 mt-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                        <div class="flex-1">
-                            <p class="text-sm text-gray-800 font-medium">Updated security protocols.</p>
-                            <p class="text-xs text-gray-500">2 days ago</p>
-                        </div>
-                    </div>
-                    <!-- Activity Item 5 -->
-                    <div class="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition">
-                        <div class="w-2 h-2 mt-2 bg-green-500 rounded-full flex-shrink-0"></div>
-                        <div class="flex-1">
-                            <p class="text-sm text-gray-800 font-medium">New marketing campaign launched.</p>
-                            <p class="text-xs text-gray-500">3 days ago</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+      // Build session table rows
+      const tbody = document.getElementById("sessionsList");
+      tbody.innerHTML = "";
+      const now = Date.now();
 
-        <!-- Recent Orders Table -->
-        <div class="mt-8 bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-            <h3 class="text-xl font-semibold text-gray-800 mb-4">Recent Orders</h3>
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#1001</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Alice Johnson</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">$450.00</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Completed</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#1002</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Robert Smith</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">$1,200.50</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#1003</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Emily Davis</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">$75.99</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Processing</span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+      let totalPower = 0;
 
-    </div>
+      Object.values(liveSessions).forEach(sess => {
+        // Duration in seconds
+        const since = Number(sess.start_time) || 0;
+        const duration = Math.round((now - since) / 1000);
+        totalPower += duration * POWER_PER_SECOND;
 
-    <!-- JavaScript for responsiveness and chart initialization -->
-    <script>
-        const sidebar = document.getElementById('sidebar');
-        const menuBtn = document.getElementById('menu-btn');
-        const overlay = document.getElementById('sidebar-overlay');
+        // Format
+        const row = `<tr>
+          <td class="vehicle">${sess.vehicle_number}</td>
+          <td>${sess.amount_paid}</td>
+          <td>${new Date(since).toLocaleTimeString()}</td>
+          <td>${Math.floor(duration / 60)}m ${duration % 60}s</td>
+        </tr>`;
+        tbody.innerHTML += row;
+      });
 
-        // Toggle sidebar visibility on mobile
-        menuBtn.addEventListener('click', () => {
-            const isHidden = sidebar.classList.contains('-translate-x-full');
-            if (isHidden) {
-                sidebar.classList.remove('-translate-x-full');
-                overlay.classList.remove('opacity-0', 'pointer-events-none');
-                overlay.classList.add('opacity-50');
-            } else {
-                sidebar.classList.add('-translate-x-full');
-                overlay.classList.add('opacity-0', 'pointer-events-none');
-                overlay.classList.remove('opacity-50');
-            }
-        });
+      // Show total power, 2 decimal places
+      document.getElementById("powerUsage").innerText = totalPower.toFixed(2);
+    }
 
-        // Close sidebar when clicking overlay
-        overlay.addEventListener('click', () => {
-            sidebar.classList.add('-translate-x-full');
-            overlay.classList.add('opacity-0', 'pointer-events-none');
-            overlay.classList.remove('opacity-50');
-        });
-
-        // Initialize Chart.js
-        window.onload = function() {
-            const ctx = document.getElementById('userGrowthChart').getContext('2d');
-            const userGrowthChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                    datasets: [{
-                        label: 'New Users',
-                        data: [1200, 1900, 1500, 2300, 2800, 3100],
-                        borderColor: '#3b82f6', // blue-500
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderWidth: 2,
-                        pointRadius: 4,
-                        tension: 0.4, // Smooth curve
-                        fill: true,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false, // Allows chart to fill the parent div's height
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false,
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                color: '#e5e7eb', // gray-200
-                            }
-                        },
-                        x: {
-                            grid: {
-                                display: false
-                            }
-                        }
-                    }
-                }
-            });
-        };
-    </script>
+    // Because power should keep updating live (even if no db update):
+    setInterval(updateDashboard, 1000); // every second update durations and power usage
+  </script>
 </body>
 </html>
