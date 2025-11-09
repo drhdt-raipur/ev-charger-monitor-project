@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>EV Charger — Start Charging</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.8/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.8/firebase-database-compat.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 22px; background: #f4fcf8; }
+    h1 { color: #188456; }
+    form { max-width: 350px; margin: 26px auto; box-shadow: 0 2px 12px #e6e6e6; padding: 20px; background: #fff; border-radius: 8px; }
+    label { font-weight: 600; }
+    input[type=text], input[type=number] { width: 99%; padding: 7px; margin: 12px 0 18px 0; border-radius: 4px; border: 1px solid #d8d8d8; }
+    button { background: #43ba7c; color: #fff; padding: 10px 16px; border: none; border-radius: 4px; font-size: 1em; }
+    .msg { color: #16884b; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <h1>Start Charging</h1>
+  <form id="chargeForm">
+    <label for="vehicle_number">Vehicle Number:</label>
+    <input type="text" id="vehicle_number" name="vehicle_number" required placeholder="e.g. CG04-AB-1234">
+
+    <label for="amount_paid">Amount to Pay (₹):</label>
+    <input type="number" min="1" id="amount_paid" name="amount_paid" required placeholder="Enter amount">
+
+    <button type="submit">Start Charging</button>
+    <div class="msg" id="msg"></div>
+  </form>
+
+  <script>
+    // Your Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDJQbgJK4GpvmLEchh0-2mWjrUW3ZAN2QI",
+      authDomain: "ev-charger-monitor-85a48.firebaseapp.com",
+      projectId: "ev-charger-monitor-85a48",
+      storageBucket: "ev-charger-monitor-85a48.firebasestorage.app",
+      messagingSenderId: "22222071413",
+      appId: "1:22222071413:web:d5a26ffd2a9014cc10fa3c",
+      measurementId: "G-PYKSBZ6XHW",
+      databaseURL: "https://ev-charger-monitor-85a48-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Form submit handler
+    document.getElementById("chargeForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const vehicle = document.getElementById("vehicle_number").value.trim().toUpperCase();
+      const amt = parseFloat(document.getElementById("amount_paid").value);
+
+      if (!vehicle || !amt || amt <= 0) {
+        document.getElementById("msg").innerText = "Please fill both fields correctly.";
+        return;
+      }
+
+      // Create a new charging session
+      const sessionData = {
+        vehicle_number: vehicle,
+        amount_paid: amt,
+        start_time: Date.now(), // timestamp in ms
+        active: true
+      };
+      db.ref("charging_sessions").push(sessionData, function(error) {
+        if (!error) {
+          document.getElementById("msg").innerText = "Charging started! Your session is now live.";
+        } else {
+          document.getElementById("msg").innerText = "Error: " + error.message;
+        }
+      });
+
+      // Optionally, reset the form
+      document.getElementById("chargeForm").reset();
+    });
+  </script>
+</body>
+</html>
