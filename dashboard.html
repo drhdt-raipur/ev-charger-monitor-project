@@ -46,8 +46,8 @@
     </div>
 
     <script type="module">
-        // Import necessary components from our local script and the Firebase CDN
-        import { getChargingSessionsCollection, isAuthReady, currentUserId, db } from 'scripts.js';
+        // The import statement is simplified to 'scripts.js' to fix module resolution errors.
+        import { getChargingSessionsCollection, isAuthReady, currentUserId } from 'scripts.js';
         import { query, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const sessionsList = document.getElementById('sessionsList');
@@ -155,10 +155,10 @@
             setupRealtimeListener();
         }
 
-        // Wait for the custom event fired by scripts.js before starting the listener
+        // 1. Wait for the custom event fired by scripts.js before starting the listener
         window.addEventListener('authReady', handleAuthReady);
         
-        // Check if authentication might have completed before the listener was attached (e.g., fast loading)
+        // 2. Immediate check: If scripts.js loaded faster and already set the flag, run the handler immediately.
         if (isAuthReady) {
              handleAuthReady(); 
         }
