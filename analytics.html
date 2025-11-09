@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>EV Charger Analytics</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.8/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.8/firebase-database-compat.js"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; background: #f4f6fb; }
+    .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+    h1 { text-align: center; color: #2c387e; }
+    .card-row { display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-between; margin-bottom: 38px; }
+    .card { flex: 1 1 200px; background: #fff; box-shadow: 0 2px 10px #e0e0e0; border-radius: 10px; padding: 24px 20px; min-width: 160px; }
+    .card h2 { margin: 0; color: #2c4367; font-size: 1.6em; }
+    .card .desc { font-size: 1em; margin-top: 7px; color: #888; }
+    #topVehicles { padding: 15px; background: #fff; border-radius: 10px; margin: 24px 0 30px 0; box-shadow: 0 1px 6px #ececec; }
+    .tag { display:inline-block; background:#e3eafc; padding:2px 8px; border-radius:15px; margin:2px 6px 2px 0; color: #4f5e85;}
+    .charts-row { display: flex; flex-wrap: wrap; gap: 35px; justify-content: space-between; }
+    .chart-card { background: #fff; border-radius: 8px; box-shadow: 0 2px 10px #ececec; padding: 26px 18px; flex: 1 1 250px; min-width: 260px; }
+    @media (max-width: 750px) {
+      .card-row, .charts-row { flex-direction: column; gap: 18px; }
+      .container { padding: 20px 4px;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>EV Charger Analytics</h1>
+    <div class="card-row">
+      <div class="card">
+        <h2 id="totalSessions">-</h2>
+        <div class="desc">Total Charging Sessions</div>
+      </div>
+      <div class="card">
+        <h2 id="activeSessions">-</h2>
+        <div class="desc">Active Sessions Now</div>
+      </div>
+      <div class="card">
+        <h2 id="totalRevenue">₹ -</h2>
+        <div class="desc">Total Revenue Collected</div>
+      </div>
+    </div>
+
+    <div id="topVehicles">
+      <b>Top 5 Vehicles by Amount Paid:</b>
+      <div id="vehicleList"></div>
+    </div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <canvas id="sessionsChart" height="170"></canvas>
+      </div>
+      <div class="chart-card">
+        <canvas id="pieChart" height="170"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyDJQbgJK4GpvmLEchh0-2mWjrUW3ZAN2QI",
+      authDomain: "ev-charger-monitor-85a48.firebaseapp.com",
+      projectId: "ev-charger-monitor-85a48",
+      storageBucket: "ev-charger-monitor-85a48.firebasestorage.app",
+      messagingSenderId: "22222071413",
+      appId: "1:22222071413:web:d5a26ffd2a9014cc10fa3c",
+      measurementId: "G-PYKSBZ6XHW",
+      databaseURL: "https://ev-charger-monitor-85a48-default-rtdb.firebaseio.com"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Chart.js global color palette:
+    const palette = ["#5677F1", "#61c8b9", "#ffad52", "#e85d70", "#a777df"];
+    let sessionsChart, pieChart;
+
+    db.ref("charging_sessions").on("value", function(snapshot) {
+      const data = snapshot.val() || {};
+
+      let totalSessions = 0, activeSessions = 0, completedSessions = 0, totalRevenue = 0;
+      const vehicleTotals = {};
+      const dailyCounts = {}; // { "2025-11-09": n }
+      const now = Date.now();
+
+      Object.values(data).forEach(sess => {
+        if (!sess.start_time) return;
+
+        const d = new Date(sess.start_time);
+        // format as yyyy-mm-dd for day grouping
+        const dayKey = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+        dailyCounts[dayKey] = (dailyCounts[dayKey] || 0) + 1;
+
+        totalSessions++;
+        if (sess.active) activeSessions++;
+        else completedSessions++;
+
+        if (sess.amount_paid) {
+          // Vehicle summary
+          const v = sess.vehicle_number || "Unknown";
+          vehicleTotals[v] = (vehicleTotals[v] || 0) + Number(sess.amount_paid);
+          totalRevenue += Number(sess.amount_paid);
+        }
+      });
+
+      // --- Top vehicles ---
+      let sortedVehicles =
+        Object.entries(vehicleTotals)
+        .sort((a,b)=>b[1]-a[1]) // descending by amount paid
+        .slice(0,5);
+
+      document.getElementById("vehicleList").innerHTML = sortedVehicles.length
+        ? sortedVehicles.map(([v, amt],i)=>`<span class="tag">${i+1}. ${v} (₹${amt})</span>`).join("")
+        : "<span style='color:#999;'>No data</span>";
+
+      // --- Stat cards ---
+      document.getElementById("totalSessions").innerText = totalSessions.toLocaleString();
+      document.getElementById("activeSessions").innerText = activeSessions.toLocaleString();
+      document.getElementById("totalRevenue").innerText = "₹ " + totalRevenue.toLocaleString();
+
+      // --- Sessions per day chart ---
+      // Prepare labels for last N days
+      const daysSorted = Object.keys(dailyCounts).sort();
+      const labels = daysSorted;
+      const values = daysSorted.map(day=>dailyCounts[day]||0);
+
+      if (!sessionsChart) {
+        const ctx = document.getElementById("sessionsChart").getContext("2d");
+        sessionsChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: '# Charging Sessions',
+              data: values,
+              backgroundColor: "#5677F1CC"
+            }]
+          },
+          options: {
+            plugins: { title: { display:true, text: "Sessions Per Day", font: {size:15} } },
+            scales: { x: { ticks:{color:'#3c486b'} }, y: { beginAtZero:true } },
+            responsive: true
+          }
+        });
+      } else {
+        sessionsChart.data.labels = labels;
+        sessionsChart.data.datasets[0].data = values;
+        sessionsChart.update();
+      }
+
+      // --- Pie: Completed/Active ---
+      const ctx2 = document.getElementById("pieChart").getContext("2d");
+      if (!pieChart) {
+        pieChart = new Chart(ctx2, {
+          type: 'pie',
+          data: {
+            labels: ['Completed', 'Active'],
+            datasets: [{
+              data: [completedSessions, activeSessions],
+              backgroundColor: ['#61c8b9','#e85d70'],
+              hoverOffset: 5
+            }]
+          },
+          options: {
+            plugins: { title: { display:true, text: "Status of All Sessions", font:{size:15}} },
+            responsive:true,
+            legend: { position:'bottom' }
+          }
+        });
+      } else {
+        pieChart.data.datasets[0].data = [completedSessions, activeSessions];
+        pieChart.update();
+      }
+    });
+  </script>
+</body>
+</html>
