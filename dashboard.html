@@ -3,418 +3,305 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EV Charger Dashboard</title>
+    <title>Responsive Dashboard</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Chart.js for visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .data-card {
-            transition: all 0.3s ease-in-out;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+        /* Custom scrollbar styling for a cleaner look */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
         }
-        .status-dot {
-            height: 12px;
-            width: 12px;
-            border-radius: 50%;
-            display: inline-block;
-            transition: background-color 0.5s;
+        ::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1; /* slate-300 */
+            border-radius: 4px;
         }
-        .charging { background-color: #34D399; } /* Green */
-        .available { background-color: #3B82F6; } /* Blue */
-        .offline { background-color: #F87171; } /* Red */
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9; /* slate-100 */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9; /* slate-100 */
+        }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen p-4 md:p-8">
+<body class="flex min-h-screen">
 
-    <div id="loading-spinner" class="flex justify-center items-center h-screen">
-        <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600"></div>
-    </div>
+    <!-- Sidebar (Hidden on Mobile, shown on Large Screens) -->
+    <aside id="sidebar" class="fixed z-20 h-full w-64 bg-white shadow-xl transition-transform duration-300 ease-in-out transform -translate-x-full lg:translate-x-0">
+        <div class="p-6">
+            <h1 class="text-3xl font-extrabold text-blue-600 tracking-wider">ProjectFlow</h1>
+        </div>
+        <nav class="mt-8 px-4 space-y-2">
+            <a href="#" class="flex items-center space-x-3 p-3 rounded-xl text-white bg-blue-600 font-semibold hover:bg-blue-700 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                <span>Dashboard</span>
+            </a>
+            <a href="#" class="flex items-center space-x-3 p-3 rounded-xl text-gray-600 hover:bg-gray-100 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20v-2c0-.656-.126-1.283-.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656-.126-1.283-.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                <span>Users</span>
+            </a>
+            <a href="#" class="flex items-center space-x-3 p-3 rounded-xl text-gray-600 hover:bg-gray-100 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v14L9 19zm0 0v-6m0 6l12-3"></path></svg>
+                <span>Reports</span>
+            </a>
+            <a href="#" class="flex items-center space-x-3 p-3 rounded-xl text-gray-600 hover:bg-gray-100 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.545.334 1.25.427 1.954.21"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                <span>Settings</span>
+            </a>
+        </nav>
+    </aside>
 
-    <div id="app-container" class="hidden max-w-4xl mx-auto">
-        <!-- Header -->
-        <header class="mb-8 p-4 bg-white rounded-xl shadow-lg">
-            <h1 class="text-3xl font-extrabold text-gray-900 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-600 mr-3" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3 14H9v-3H6v-2h3V8h6v3h3v2h-3v3z"/>
-                </svg>
-                EV Charger Monitor
-            </h1>
-            <p class="text-sm text-gray-500 mt-2">
-                User ID: <span id="user-id" class="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">...</span>
-            </p>
+    <!-- Overlay for mobile sidebar -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black opacity-0 z-10 lg:hidden pointer-events-none transition-opacity duration-300"></div>
+
+    <!-- Main Content Wrapper -->
+    <div class="flex-1 lg:ml-64 p-4 lg:p-8">
+
+        <!-- Header/Top Bar -->
+        <header class="flex justify-between items-center py-4 px-2 mb-6 bg-white shadow-md rounded-xl">
+            <!-- Mobile Menu Button -->
+            <button id="menu-btn" class="p-2 rounded-lg lg:hidden text-gray-700 hover:bg-gray-100 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <h2 class="text-2xl font-bold text-gray-800 hidden sm:block">Analytics Overview</h2>
+            <div class="flex items-center space-x-4">
+                <div class="relative">
+                    <input type="text" placeholder="Search..." class="py-2 px-4 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition w-32 sm:w-64">
+                    <svg class="w-5 h-5 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                <button class="p-2 rounded-full text-gray-600 hover:bg-gray-100 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.405L4 17h5m6 0v1a3 3 0 11-6 0v-1"></path></svg>
+                </button>
+                <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-sm font-semibold text-gray-700">JD</div>
+            </div>
         </header>
 
-        <!-- Status Card -->
-        <div class="mb-8 p-6 bg-white rounded-xl data-card border-l-4 border-indigo-600">
-            <div class="flex items-center justify-between">
-                <h2 class="text-2xl font-semibold text-gray-800">Charger Status</h2>
-                <button id="action-button" class="px-6 py-2 rounded-full font-bold text-white transition-all transform hover:scale-105 active:scale-95 shadow-md">
-                    Start Charging
-                </button>
+        <!-- Key Metrics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Card 1: Total Users -->
+            <div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-blue-500">
+                <p class="text-sm font-medium text-gray-500">Total Users</p>
+                <div class="flex items-center justify-between mt-1">
+                    <p class="text-3xl font-bold text-gray-900">14,208</p>
+                    <span class="text-green-500 text-sm font-semibold flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>
+                        12.5%
+                    </span>
+                </div>
             </div>
-            <div class="mt-4 flex items-center">
-                <span id="status-dot" class="status-dot mr-3"></span>
-                <span id="charger-status" class="text-4xl font-extrabold text-gray-900">Loading...</span>
+            <!-- Card 2: Revenue -->
+            <div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-green-500">
+                <p class="text-sm font-medium text-gray-500">Total Revenue</p>
+                <div class="flex items-center justify-between mt-1">
+                    <p class="text-3xl font-bold text-gray-900">$87,900</p>
+                    <span class="text-green-500 text-sm font-semibold flex items-center">
+                         <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>
+                        4.1%
+                    </span>
+                </div>
             </div>
-            <p id="session-time" class="text-sm text-gray-500 mt-2">Last Update: ...</p>
+            <!-- Card 3: Pending Tasks -->
+            <div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-yellow-500">
+                <p class="text-sm font-medium text-gray-500">Pending Tasks</p>
+                <div class="flex items-center justify-between mt-1">
+                    <p class="text-3xl font-bold text-gray-900">45</p>
+                    <span class="text-red-500 text-sm font-semibold flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                        -2.1%
+                    </span>
+                </div>
+            </div>
+            <!-- Card 4: New Signups -->
+            <div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-purple-500">
+                <p class="text-sm font-medium text-gray-500">New Signups (7D)</p>
+                <div class="flex items-center justify-between mt-1">
+                    <p class="text-3xl font-bold text-gray-900">980</p>
+                    <span class="text-green-500 text-sm font-semibold flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>
+                        8.9%
+                    </span>
+                </div>
+            </div>
         </div>
 
-        <!-- Metrics Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <!-- Current Power -->
-            <div class="p-6 bg-white rounded-xl data-card hover:shadow-xl">
-                <p class="text-sm font-medium text-gray-500">Current Power</p>
-                <div class="mt-1 flex items-end">
-                    <span id="current-power" class="text-3xl font-extrabold text-indigo-600">0.0</span>
-                    <span class="ml-2 text-base text-gray-500">kW</span>
+        <!-- Charts and Activity Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Main Chart Area -->
+            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">User Growth Over 6 Months</h3>
+                <div class="h-80">
+                    <canvas id="userGrowthChart"></canvas>
                 </div>
             </div>
 
-            <!-- Energy Delivered -->
-            <div class="p-6 bg-white rounded-xl data-card hover:shadow-xl">
-                <p class="text-sm font-medium text-gray-500">Energy Delivered</p>
-                <div class="mt-1 flex items-end">
-                    <span id="energy-delivered" class="text-3xl font-extrabold text-indigo-600">0.00</span>
-                    <span class="ml-2 text-base text-gray-500">kWh</span>
-                </div>
-            </div>
-
-            <!-- Session Time -->
-            <div class="p-6 bg-white rounded-xl data-card hover:shadow-xl">
-                <p class="text-sm font-medium text-gray-500">Session Duration</p>
-                <div class="mt-1 flex items-end">
-                    <span id="session-duration" class="text-3xl font-extrabold text-indigo-600">00:00:00</span>
+            <!-- Recent Activity/Feed -->
+            <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Recent Activity</h3>
+                <div class="space-y-4 max-h-96 overflow-y-auto">
+                    <!-- Activity Item 1 -->
+                    <div class="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition">
+                        <div class="w-2 h-2 mt-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-800 font-medium">New feature deployed to Production.</p>
+                            <p class="text-xs text-gray-500">2 hours ago</p>
+                        </div>
+                    </div>
+                    <!-- Activity Item 2 -->
+                    <div class="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition">
+                        <div class="w-2 h-2 mt-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-800 font-medium">Payment received from Acme Corp.</p>
+                            <p class="text-xs text-gray-500">5 hours ago</p>
+                        </div>
+                    </div>
+                    <!-- Activity Item 3 -->
+                    <div class="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition">
+                        <div class="w-2 h-2 mt-2 bg-yellow-500 rounded-full flex-shrink-0"></div>
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-800 font-medium">4 bugs reported by QA team.</p>
+                            <p class="text-xs text-gray-500">Yesterday at 10:30 AM</p>
+                        </div>
+                    </div>
+                    <!-- Activity Item 4 -->
+                    <div class="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-500 transition">
+                        <div class="w-2 h-2 mt-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-800 font-medium">Updated security protocols.</p>
+                            <p class="text-xs text-gray-500">2 days ago</p>
+                        </div>
+                    </div>
+                    <!-- Activity Item 5 -->
+                    <div class="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition">
+                        <div class="w-2 h-2 mt-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-800 font-medium">New marketing campaign launched.</p>
+                            <p class="text-xs text-gray-500">3 days ago</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Charging Log (Simple List) -->
-        <div class="p-6 bg-white rounded-xl data-card">
-            <h3 class="text-xl font-semibold text-gray-800 mb-4">Live Updates</h3>
-            <ul id="log-list" class="space-y-2 text-sm max-h-48 overflow-y-auto">
-                <li class="text-gray-500">Waiting for data...</li>
-            </ul>
+        <!-- Recent Orders Table -->
+        <div class="mt-8 bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Recent Orders</h3>
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#1001</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Alice Johnson</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">$450.00</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Completed</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#1002</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Robert Smith</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">$1,200.50</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#1003</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Emily Davis</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">$75.99</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Processing</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
+
     </div>
 
-    <!-- Firebase Scripts and Logic -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <!-- JavaScript for responsiveness and chart initialization -->
+    <script>
+        const sidebar = document.getElementById('sidebar');
+        const menuBtn = document.getElementById('menu-btn');
+        const overlay = document.getElementById('sidebar-overlay');
 
-        // Set Firebase logging level for debugging purposes
-        setLogLevel('Debug');
-
-        // Global Firebase variables
-        let app;
-        let db;
-        let auth;
-        let userId = null;
-        let isAuthReady = false;
-
-        // Configuration variables (retrieved from canvas environment)
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // DOM elements
-        const loadingSpinner = document.getElementById('loading-spinner');
-        const appContainer = document.getElementById('app-container');
-        const chargerStatusEl = document.getElementById('charger-status');
-        const statusDotEl = document.getElementById('status-dot');
-        const currentPowerEl = document.getElementById('current-power');
-        const energyDeliveredEl = document.getElementById('energy-delivered');
-        const sessionDurationEl = document.getElementById('session-duration');
-        const sessionTimeEl = document.getElementById('session-time');
-        const actionButton = document.getElementById('action-button');
-        const logList = document.getElementById('log-list');
-        const userIdEl = document.getElementById('user-id');
-
-        // --- Utility Functions ---
-
-        /**
-         * Formats seconds into HH:MM:SS
-         * @param {number} totalSeconds
-         * @returns {string}
-         */
-        const formatTime = (totalSeconds) => {
-            const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
-            const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
-            const s = String(Math.floor(totalSeconds % 60)).padStart(2, '0');
-            return `${h}:${m}:${s}`;
-        };
-
-        /**
-         * Adds a message to the live update log.
-         * @param {string} message
-         */
-        const logUpdate = (message) => {
-            const li = document.createElement('li');
-            li.className = 'text-gray-800 flex items-center';
-            li.innerHTML = `<span class="text-indigo-500 mr-2">•</span> ${new Date().toLocaleTimeString()} - ${message}`;
-            logList.prepend(li);
-            if (logList.children.length > 5) {
-                logList.removeChild(logList.lastChild);
-            }
-        };
-
-        // --- Charger Data Schema & Paths ---
-
-        const CHARGER_INITIAL_DATA = {
-            status: "Available", // Available | Charging | Offline
-            currentPowerKW: 0.0,
-            energyDeliveredKWh: 0.00,
-            sessionStartTime: null, // ISO string for session start
-            lastUpdated: serverTimestamp()
-        };
-
-        const getChargerDocRef = () => {
-            if (!db || !userId) return null;
-            // Private data path: /artifacts/{appId}/users/{userId}/chargerData/currentCharger
-            return doc(db, 'artifacts', appId, 'users', userId, 'chargerData', 'currentCharger');
-        };
-
-        // --- Firebase Initialization and Auth ---
-
-        const setupFirebase = async () => {
-            if (!firebaseConfig) {
-                console.error("Firebase configuration is missing or invalid.");
-                return;
-            }
-
-            try {
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-
-                // 1. Handle Authentication
-                // onAuthStateChanged will fire once the auth state is determined
-                onAuthStateChanged(auth, async (user) => {
-                    isAuthReady = true;
-                    if (user) {
-                        userId = user.uid;
-                        console.log("Authenticated with UID:", userId);
-                    } else {
-                        // Attempt to sign in anonymously if auth failed or no token was provided
-                        await signInAnonymously(auth);
-                    }
-                    // Start listening for data ONLY after auth is ready
-                    if (userId) {
-                        userIdEl.textContent = userId;
-                        initializeCharger();
-                        subscribeToChargerUpdates();
-                    } else {
-                        console.warn("Could not determine user ID. Trying again...");
-                    }
-                });
-
-                // Use custom token if available (provided by the canvas environment)
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    // Sign in anonymously as a fallback if no token is present
-                    await signInAnonymously(auth);
-                }
-
-            } catch (error) {
-                console.error("Error during Firebase setup or sign-in:", error);
-                loadingSpinner.innerHTML = '<p class="text-red-600">Error loading app. Check console for details.</p>';
-            }
-        };
-
-        // --- Data Handling ---
-
-        /**
-         * Initializes the charger document if it doesn't exist.
-         */
-        const initializeCharger = async () => {
-            const chargerRef = getChargerDocRef();
-            if (!chargerRef) return;
-            try {
-                // Set the initial state without overwriting existing data if it's there
-                await setDoc(chargerRef, CHARGER_INITIAL_DATA, { merge: true });
-                logUpdate('Charger state initialized.');
-            } catch (e) {
-                console.error("Error initializing charger document: ", e);
-            }
-        };
-
-        /**
-         * Updates the UI based on the latest Firestore data.
-         * @param {object} data
-         */
-        const updateUI = (data) => {
-            const { status, currentPowerKW, energyDeliveredKWh, sessionStartTime, lastUpdated } = data;
-
-            // 1. Status and Dot
-            chargerStatusEl.textContent = status;
-            statusDotEl.className = `status-dot mr-3 ${status.toLowerCase()}`;
-
-            // 2. Metrics
-            currentPowerEl.textContent = currentPowerKW.toFixed(1);
-            energyDeliveredEl.textContent = energyDeliveredKWh.toFixed(2);
-
-            // 3. Action Button
-            actionButton.classList.remove('bg-green-500', 'bg-red-500', 'bg-blue-500');
-            actionButton.disabled = false;
-
-            if (status === 'Charging') {
-                actionButton.textContent = 'Stop Charging';
-                actionButton.classList.add('bg-red-500');
-            } else if (status === 'Available') {
-                actionButton.textContent = 'Start Charging';
-                actionButton.classList.add('bg-green-500');
-            } else { // Offline
-                actionButton.textContent = 'Offline';
-                actionButton.classList.add('bg-gray-500');
-                actionButton.disabled = true;
-            }
-
-            // 4. Time and Duration
-            if (sessionStartTime) {
-                const startTime = new Date(sessionStartTime);
-                const now = new Date();
-                const durationSeconds = Math.floor((now.getTime() - startTime.getTime()) / 1000);
-                sessionDurationEl.textContent = formatTime(durationSeconds);
-                sessionTimeEl.textContent = `Session started: ${startTime.toLocaleString()}`;
+        // Toggle sidebar visibility on mobile
+        menuBtn.addEventListener('click', () => {
+            const isHidden = sidebar.classList.contains('-translate-x-full');
+            if (isHidden) {
+                sidebar.classList.remove('-translate-x-full');
+                overlay.classList.remove('opacity-0', 'pointer-events-none');
+                overlay.classList.add('opacity-50');
             } else {
-                sessionDurationEl.textContent = '00:00:00';
-                sessionTimeEl.textContent = `Last Update: ${lastUpdated ? new Date(lastUpdated.toDate()).toLocaleString() : 'N/A'}`;
-            }
-
-            logUpdate(`Status updated: ${status}`);
-        };
-
-        let intervalId = null;
-
-        /**
-         * Starts a simulation of data updates while charging.
-         * @param {string} sessionStartTime
-         */
-        const startSimulation = (sessionStartTime) => {
-            if (intervalId) clearInterval(intervalId);
-
-            let totalEnergy = 0;
-            const powerKW = 7.2; // Constant power draw for simulation
-
-            const updateDuration = () => {
-                const startTime = new Date(sessionStartTime);
-                const now = new Date();
-                const durationSeconds = Math.floor((now.getTime() - startTime.getTime()) / 1000);
-                sessionDurationEl.textContent = formatTime(durationSeconds);
-
-                // Simulate data increment every second
-                totalEnergy += powerKW / 3600; // kWh per second
-
-                // Update Firestore document with new simulated metrics
-                const chargerRef = getChargerDocRef();
-                if (chargerRef) {
-                    setDoc(chargerRef, {
-                        currentPowerKW: powerKW,
-                        energyDeliveredKWh: totalEnergy,
-                        lastUpdated: serverTimestamp()
-                    }, { merge: true }).catch(e => console.error("Error simulating update:", e));
-                }
-            };
-
-            updateDuration(); // Initial update
-            intervalId = setInterval(updateDuration, 1000);
-        };
-
-        const stopSimulation = () => {
-            if (intervalId) {
-                clearInterval(intervalId);
-                intervalId = null;
-            }
-        };
-
-        /**
-         * Subscribes to real-time updates from Firestore.
-         */
-        const subscribeToChargerUpdates = () => {
-            const chargerRef = getChargerDocRef();
-            if (!chargerRef) {
-                console.error("Cannot subscribe: Charger document reference is null.");
-                return;
-            }
-
-            onSnapshot(chargerRef, (docSnap) => {
-                loadingSpinner.classList.add('hidden');
-                appContainer.classList.remove('hidden');
-
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    updateUI(data);
-
-                    if (data.status === 'Charging' && data.sessionStartTime) {
-                        // Start simulation/duration counter if charging
-                        startSimulation(data.sessionStartTime);
-                    } else {
-                        // Stop simulation/duration counter if not charging
-                        stopSimulation();
-                    }
-                } else {
-                    // Document doesn't exist, create it (should be covered by initializeCharger)
-                    console.log("Document does not exist. Initializing...");
-                    setDoc(chargerRef, CHARGER_INITIAL_DATA).catch(e => console.error("Error setting initial doc:", e));
-                }
-            }, (error) => {
-                console.error("Error subscribing to charger updates:", error);
-                logUpdate('Error fetching data.');
-            });
-        };
-
-        // --- Event Listener for Action Button ---
-
-        actionButton.addEventListener('click', async () => {
-            actionButton.disabled = true;
-            const currentStatus = chargerStatusEl.textContent;
-            const chargerRef = getChargerDocRef();
-
-            if (!chargerRef) {
-                console.error("Cannot perform action: Charger document reference is null.");
-                actionButton.disabled = false;
-                return;
-            }
-
-            try {
-                if (currentStatus === 'Available') {
-                    // Start Charging
-                    await setDoc(chargerRef, {
-                        status: "Charging",
-                        sessionStartTime: new Date().toISOString(),
-                        currentPowerKW: 7.2, // Start with non-zero power
-                        energyDeliveredKWh: 0.00,
-                        lastUpdated: serverTimestamp()
-                    }, { merge: true });
-                    logUpdate('Charging session started.');
-
-                } else if (currentStatus === 'Charging') {
-                    // Stop Charging
-                    await setDoc(chargerRef, {
-                        status: "Available",
-                        sessionStartTime: null,
-                        currentPowerKW: 0.0,
-                        // Keep energyDeliveredKWh to show total charged
-                        lastUpdated: serverTimestamp()
-                    }, { merge: true });
-                    logUpdate('Charging session stopped.');
-
-                }
-            } catch (e) {
-                console.error("Error updating charger status:", e);
-                logUpdate('Failed to update status due to an error.');
-            } finally {
-                // Button re-enabled by onSnapshot update
+                sidebar.classList.add('-translate-x-full');
+                overlay.classList.add('opacity-0', 'pointer-events-none');
+                overlay.classList.remove('opacity-50');
             }
         });
 
-        // Start the application setup
-        window.onload = setupFirebase;
+        // Close sidebar when clicking overlay
+        overlay.addEventListener('click', () => {
+            sidebar.classList.add('-translate-x-full');
+            overlay.classList.add('opacity-0', 'pointer-events-none');
+            overlay.classList.remove('opacity-50');
+        });
 
+        // Initialize Chart.js
+        window.onload = function() {
+            const ctx = document.getElementById('userGrowthChart').getContext('2d');
+            const userGrowthChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'New Users',
+                        data: [1200, 1900, 1500, 2300, 2800, 3100],
+                        borderColor: '#3b82f6', // blue-500
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 4,
+                        tension: 0.4, // Smooth curve
+                        fill: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, // Allows chart to fill the parent div's height
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: '#e5e7eb', // gray-200
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        };
     </script>
 </body>
 </html>
